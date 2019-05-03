@@ -4,7 +4,7 @@ import {str as crc32_str} from "crc-32";
 import ProxyPolyfill from './proxy-polyfill';
 import {getCollectionHandlers, shouldInstrument} from "./shouldInstrument";
 import {weakMemoizeArray} from "./weakMemoize";
-import {EDGE, memoizedBuildTrie} from "./objectTrie";
+import {EDGE, pushObjTrie} from "./objectTrie";
 
 const hasProxy = typeof Proxy !== 'undefined';
 const ProxyConstructor = hasProxy ? Proxy : ProxyPolyfill();
@@ -316,7 +316,7 @@ const proxyShallowEqual = (a, b, locations) => {
   differ = [];
   differs = [];
   const ret = (() => {
-    const root = memoizedBuildTrie(locations);
+    const root = locations;
     return walk(a, b, root);
   })();
   DISABLE_ALL_PROXIES = false;
@@ -338,9 +338,7 @@ const proxyShallow = (a, b, affected) => {
 };
 
 const proxyState = (state, fingerPrint = '', _ProxyMap) => {
-  let lastAffected = null;
-  let affected = [];
-  let affectedEqualToLast = true;
+  let affectedTrie = {};
 
   let set = new Set();
   let ProxyMap = _ProxyMap || new WeakMap();
@@ -377,26 +375,16 @@ const proxyState = (state, fingerPrint = '', _ProxyMap) => {
       } else {
         if (!set.has(key)) {
           set.add(key);
-          affected.push(key);
-          if (lastAffected) {
-            const position = affected.length - 1;
-            if (lastAffected[position] !== affected[position]) {
-              affectedEqualToLast = false;
-            }
-          }
+          pushObjTrie(affectedTrie, key);
         }
       }
     }
     return key;
   };
 
-  const shouldUseLastAffected = () => (
-    lastAffected && affectedEqualToLast && lastAffected.length === affected.length
-  );
-
   const control = {
     get affected() {
-      return shouldUseLastAffected() ? lastAffected : affected;
+      return affectedTrie;
     },
     get spreadDetected() {
       return spreadDetected;
@@ -420,11 +408,7 @@ const proxyState = (state, fingerPrint = '', _ProxyMap) => {
     },
 
     reset() {
-      if (!shouldUseLastAffected()) {
-        lastAffected = affected;
-      }
-      affectedEqualToLast = true;
-      affected = [];
+      affectedTrie = {};
       spreadDetected = false;
       sealed = 0;
       set.clear();
@@ -508,11 +492,11 @@ const proxyArrayRest = (state, fromIndex) => {
 };
 
 export {
-  proxyEqual,
-  proxyShallow,
+  proxyEqual as unsupportedProxyEqual,
+  proxyShallow as unsupportedProxyShallow,
   proxyShallowEqual,
   proxyState,
-  proxyCompare,
+  proxyCompare as unsupportedProxyCompare,
 
   get,
   deproxify,
