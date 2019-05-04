@@ -3,7 +3,7 @@ import {str as crc32_str} from "crc-32";
 
 import ProxyPolyfill from './proxy-polyfill';
 import {getCollectionHandlers, shouldInstrument} from "./shouldInstrument";
-import {weakMemoizeArray} from "./weakMemoize";
+import {weakMemoizeArray, weakMemoizeWalk} from "./weakMemoize";
 import {EDGE, pushObjTrie} from "./objectTrie";
 
 const hasProxy = typeof Proxy !== 'undefined';
@@ -257,6 +257,16 @@ const get = (target, path) => {
   return result;
 };
 
+const getOne = (target, key) => {
+  if (!target) return target;
+  if (key[0] === '!') {
+    if (key === objectKeysMarker) {
+      return Object.keys(target).map(crc32_str).reduce((acc, x) => acc ^ x, 0);
+    }
+  }
+  return target[key];
+};
+
 let differs = [];
 
 export const drainDifference = () => {
@@ -286,10 +296,8 @@ const proxyCompare = (a, b, locations) => {
   return ret;
 };
 
-const getterHelper = ['',''];
-
 let differ = [];
-const walk = (la, lb, node) => {
+const memoizedWalk = weakMemoizeWalk((la, lb, node) => {
   if (la === lb || deepDeproxify(la) === deepDeproxify(lb)) {
     return true;
   }
@@ -299,10 +307,9 @@ const walk = (la, lb, node) => {
   const items = Object.keys(node);
   for (let i = 0; i < items.length; ++i) {
     const item = items[i];
-    getterHelper[1]=item;
-    if (!walk(
-      get(la, getterHelper),
-      get(lb, getterHelper),
+    if (!memoizedWalk(
+      getOne(la, item),
+      getOne(lb, item),
       node[item],
     )) {
       differ.unshift(item);
@@ -310,14 +317,14 @@ const walk = (la, lb, node) => {
     }
   }
   return true;
-};
+});
 const proxyShallowEqual = (a, b, locations) => {
   DISABLE_ALL_PROXIES = true;
   differ = [];
   differs = [];
   const ret = (() => {
     const root = locations;
-    return walk(a, b, root);
+    return memoizedWalk(a, b, root);
   })();
   DISABLE_ALL_PROXIES = false;
   if(!ret) {
