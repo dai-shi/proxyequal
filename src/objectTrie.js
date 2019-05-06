@@ -1,8 +1,8 @@
-import {weakMemoizeArray} from "./weakMemoize";
+import {weakMemoizeObj} from "./weakMemoize";
 
 export const EDGE = 'EDGE';
 
-export const pushObjTrie = (root, line) => {
+const pushObjTrie = (root, line) => {
   const path = line.split('.');
   let node = root;
   const lastIndex = path.length - 1;
@@ -24,4 +24,4 @@ const buildObjTrie = (lines) => {
   return root;
 };
 
-export const memoizedBuildTrie = weakMemoizeArray(buildObjTrie);
+export const memoizedBuildTrie = weakMemoizeObj(buildObjTrie);

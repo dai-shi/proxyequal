@@ -16,6 +16,18 @@ export const weakMemoizeArray = fn => {
   }
 }
 
+export const weakMemoizeObj = fn => {
+  let cache = new WeakMap();
+  return arg => {
+    if (cache.has(arg)) {
+      return cache.get(arg);
+    }
+    const ret = fn(arg);
+    cache.set(arg, ret);
+    return ret;
+  };
+};
+
 export const weakMemoizeWalk = fn => {
   let cache = new WeakMap();
   return (a, b, node) => {
@@ -35,5 +47,5 @@ export const weakMemoizeWalk = fn => {
       b,
     });
     return ret;
-  }
+  };
 };
